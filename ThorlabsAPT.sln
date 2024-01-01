@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThorlabsControls", "ThorlabsControls\ThorlabsControls.csproj", "{D355146A-C4ED-4134-BF7D-3E084A9D6B7F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Functions", "Functions\Functions.csproj", "{05167F85-CF81-456B-8BC0-17F7661BF4C9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Parsing", "Parsing\Parsing.csproj", "{6DA64BC0-0402-44B8-946C-07E7C78AE17C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D355146A-C4ED-4134-BF7D-3E084A9D6B7F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D355146A-C4ED-4134-BF7D-3E084A9D6B7F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D355146A-C4ED-4134-BF7D-3E084A9D6B7F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D355146A-C4ED-4134-BF7D-3E084A9D6B7F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{05167F85-CF81-456B-8BC0-17F7661BF4C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05167F85-CF81-456B-8BC0-17F7661BF4C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05167F85-CF81-456B-8BC0-17F7661BF4C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05167F85-CF81-456B-8BC0-17F7661BF4C9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6DA64BC0-0402-44B8-946C-07E7C78AE17C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6DA64BC0-0402-44B8-946C-07E7C78AE17C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6DA64BC0-0402-44B8-946C-07E7C78AE17C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6DA64BC0-0402-44B8-946C-07E7C78AE17C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
