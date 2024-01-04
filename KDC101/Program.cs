@@ -7,6 +7,7 @@ public class KDC101
     private readonly Incoming.MessageUnpacker _messageUnpackerObject = new();
     private readonly USB_Communication.UsbPeripheralChipFT232BM _usbChipObject = new();
     
+    
     public KDC101() // Constructor method
     {
         Task.Run(ProcessMessages);
