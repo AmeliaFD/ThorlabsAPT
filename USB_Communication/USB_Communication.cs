@@ -1,14 +1,16 @@
 ﻿using System.IO.Ports;
 
-namespace ThorlabsControls;
+namespace USB_Communication;
 
-public abstract class ThorlabsControls
+public class UsbPeripheralChipFT232BM
 {
-    public static void Main(string[] args)
-    {
-    }
-
-    public static SerialPort? GetDevicePort(string targetSerialNumber)
+    // TODO add code to send/recieve serial via USB with FT232BM peripheral chip
+    // The client program is required to set up the necessary FTDI chip serial port settings 
+    // used to communicate to the Thorlabs controller embedded system (Protocol Issue 37, page 31)
+    
+    // TODO Add ftSend method that takes byte[] input and sends to KDC101
+    
+    public SerialPort? GetDevicePort(string targetSerialNumber)
     {
         // Get a list of all available serial ports on the PC
         string[] allPortNames = SerialPort.GetPortNames();
@@ -18,7 +20,7 @@ public abstract class ThorlabsControls
         {
             Console.WriteLine(portName);
         }
-
+        
         // Identify which ports are connected to Thorlabs devices
         foreach (string portName in allPortNames)
         {
@@ -63,5 +65,14 @@ public abstract class ThorlabsControls
         }
 
         return null;
+    }
+    
+    public void AddToQueue(byte[] message, Queue<byte> messageQueue)
+    {
+        foreach (byte b in message)
+        {
+            // Add the incoming message to the queue, one byte at a time
+            messageQueue.Enqueue(b);
+        }
     }
 }

@@ -1,25 +1,81 @@
 ﻿using System.Reflection;
 
-namespace Parsing;
+namespace Incoming;
 
-public class Queue
+public class MessageUnpacker
 {
-    public static void Main(string[] args)
+    // Dictionary where keys are message identifiers and the corresponding values are Methods that process those messages
+    private Dictionary<int, (Func<byte[], dynamic>, int expectedTotalMsgLength)> _msgIdToFunc = new();
+    
+    // Constructor method automatically populates msgIdToFunc dictionary each time a new 'MessageUnpacker' object is created
+    public MessageUnpacker()
     {
+        _msgIdToFunc.Add(0x0212, (MOD_GET_CHANENABLESTATE, 6));
+        _msgIdToFunc.Add(0x0006, (HW_GET_INFO, 90));
+        _msgIdToFunc.Add(0x0066, (HUB_GET_BAYUSED, 6));
+        _msgIdToFunc.Add(0x0412, (MOT_GET_POSCOUNTER, 12));
+        _msgIdToFunc.Add(0x040B, (MOT_GET_ENCCOUNTER, 12));
+        _msgIdToFunc.Add(0x0415, (MOT_GET_VELPARAMS, 20));
+        _msgIdToFunc.Add(0x0418, (MOT_GET_JOGPARAMS, 28));
+        _msgIdToFunc.Add(0x043C, (MOT_GET_GENMOVEPARAMS, 12));
+        _msgIdToFunc.Add(0x0447, (MOT_GET_MOVERELPARAMS, 12));
+        _msgIdToFunc.Add(0x0452, (MOT_GET_MOVEABSPARAMS, 12));
+        _msgIdToFunc.Add(0x0442, (MOT_GET_HOMEPARAMS, 20));
+        _msgIdToFunc.Add(0x0425, (MOT_GET_LIMSWITCHPARAMS, 20));
+        _msgIdToFunc.Add(0x0444, (MOT_MOVE_HOMED, 6));
+        _msgIdToFunc.Add(0x0464, (MOT_MOVE_COMPLETED, 20));
+        _msgIdToFunc.Add(0x0466, (MOT_MOVE_STOPPED, 20));
+        _msgIdToFunc.Add(0x04A2, (MOT_GET_DCPIDPARAMS, 26));
+        _msgIdToFunc.Add(0x04B5, (MOT_GET_AVMODES, 10));
+        _msgIdToFunc.Add(0x04B2, (MOT_GET_POTPARAMS, 28));
+        _msgIdToFunc.Add(0x04B8, (MOT_GET_BUTTONPARAMS, 20));
+        _msgIdToFunc.Add(0x0491, (MOT_GET_USTATUSUPDATE, 20));
+        _msgIdToFunc.Add(0x042A, (MOT_GET_STATUSBITS, 12));
     }
     
-    private readonly Queue<byte> messageQueue = new();
-
-    public void AddToQueue(byte[] message)
+    public dynamic UnpackMessage(Queue<byte> messageQueue)
     {
-        foreach (byte b in message)
+        // Read the 6 byte message header from the incoming message queue
+        byte[] header = ReadHeader(messageQueue);
+        
+        // Extract the message ID from bytes 0 & 1 of the header
+        int msgId = BitConverter.ToInt16(header, 0);
+        if (!_msgIdToFunc.ContainsKey(msgId))
         {
-            // Add the incoming message to the queue, one byte at a time
-            messageQueue.Enqueue(b);
+            throw new InvalidOperationException($"Unknown message ID: {msgId}");
+        }
+        
+        // Extract the destination code from byte 4 of the header and check if a data packet is indicated
+        byte dest = header[4];
+        
+        if ((dest & 0x80) != 0) // Message with data packet
+        {
+            // Lookup the message ID in the msgIdToFunc dictionary
+            var (messageFunc, expectedLength) = _msgIdToFunc[msgId];
+            
+            // Read the data packet from the incoming message queue
+            byte[] dataPacket = ReadDataPacket(messageQueue, expectedLength - 6);
+            
+            // Pass the data packet to the corresponding parsing function and return the result
+            return messageFunc.Invoke(dataPacket);
+        }
+        else // Message without data packet
+        {
+            // Lookup the message ID in the msgIdToFunc dictionary
+            var (messageFunc, expectedLength) = _msgIdToFunc[msgId];
+            
+            // Check 'header' total length matches the expected number of bytes for this function (always 6 bytes for header-only messages)
+            if (header.Length != expectedLength)
+            {
+                throw new ArgumentException($"{MethodBase.GetCurrentMethod()?.Name} encountered an unexpected input array length ({header.Length} bytes) which does not match the expected length ({expectedLength} bytes).");
+            }
+            
+            // Pass the data packet to the corresponding parsing function and return the result
+            return (msgId, msgData: messageFunc.Invoke(header));
         }
     }
     
-    public byte[] ReadHeader()
+    public byte[] ReadHeader(Queue<byte> messageQueue)
     {
         if (messageQueue.Count < 6) 
         {
@@ -38,9 +94,9 @@ public class Queue
         return header;
     }
 
-    public byte[] ReadDataPacket(int dataPacketLength)
+    public byte[] ReadDataPacket(Queue<byte> messageQueue, int dataPacketLength)
     {
-        if (messageQueue.Count < dataPacketLength) 
+        if (messageQueue.Count < dataPacketLength)
         {
             throw new InvalidOperationException($"Insufficient data to read message. Total queue is shorter than expected data packet length ({dataPacketLength} bytes)");
         }
@@ -56,82 +112,8 @@ public class Queue
         
         return dataPacket;
     }
-}
-
-public class MessageUnpacker
-{
-    // Dictionary where keys are message identifiers and the corresponding values are Methods that process those messages
-    private Dictionary<int, (Func<byte[], dynamic>, int expectedTotalMsgLength)> msgIdToFunc = new();
     
-    // Constructor method automatically populates msgIdToFunc dictionary each time a new MessageUnpacker object is created
-    public MessageUnpacker()
-    {
-        msgIdToFunc.Add(0x0212, (MOD_GET_CHANENABLESTATE, 6));
-        msgIdToFunc.Add(0x0006, (HW_GET_INFO, 90));
-        msgIdToFunc.Add(0x0066, (HUB_GET_BAYUSED, 6));
-        msgIdToFunc.Add(0x0412, (MOT_GET_POSCOUNTER, 12));
-        msgIdToFunc.Add(0x040B, (MOT_GET_ENCCOUNTER, 12));
-        msgIdToFunc.Add(0x0415, (MOT_GET_VELPARAMS, 20));
-        msgIdToFunc.Add(0x0418, (MOT_GET_JOGPARAMS, 28));
-        msgIdToFunc.Add(0x043C, (MOT_GET_GENMOVEPARAMS, 12));
-        msgIdToFunc.Add(0x0447, (MOT_GET_MOVERELPARAMS, 12));
-        msgIdToFunc.Add(0x0452, (MOT_GET_MOVEABSPARAMS, 12));
-        msgIdToFunc.Add(0x0442, (MOT_GET_HOMEPARAMS, 20));
-        msgIdToFunc.Add(0x0425, (MOT_GET_LIMSWITCHPARAMS, 20));
-        msgIdToFunc.Add(0x0444, (MOT_MOVE_HOMED, 6));
-        msgIdToFunc.Add(0x0464, (MOT_MOVE_COMPLETED, 20));
-        msgIdToFunc.Add(0x0466, (MOT_MOVE_STOPPED, 20));
-        msgIdToFunc.Add(0x04A2, (MOT_GET_DCPIDPARAMS, 26));
-        msgIdToFunc.Add(0x04B5, (MOT_GET_AVMODES, 10));
-        msgIdToFunc.Add(0x04B2, (MOT_GET_POTPARAMS, 28));
-        msgIdToFunc.Add(0x04B8, (MOT_GET_BUTTONPARAMS, 20));
-        msgIdToFunc.Add(0x0491, (MOT_GET_USTATUSUPDATE, 20));
-        msgIdToFunc.Add(0x042A, (MOT_GET_STATUSBITS, 12));
-    }
-    
-    public dynamic UnpackMessage(Queue messageQueue)
-    {
-        // Read the 6 byte message header from the incoming message queue
-        byte[] header = messageQueue.ReadHeader();
-        
-        // Extract the message ID from bytes 0 & 1 of the header
-        int msgId = BitConverter.ToInt16(header, 0);
-        if (!msgIdToFunc.ContainsKey(msgId))
-        {
-            throw new InvalidOperationException($"Unknown message ID: {msgId}");
-        }
-        
-        // Extract the destination code from byte 4 of the header and check if a data packet is indicated
-        byte dest = header[4];
-        
-        if ((dest & 0x80) != 0) // Message with data packet
-        {
-            // Lookup the message ID in the msgIdToFunc dictionary
-            var (messageFunc, expectedLength) = msgIdToFunc[msgId];
-            
-            // Read the data packet from the incoming message queue
-            byte[] dataPacket = messageQueue.ReadDataPacket(expectedLength - 6);
-            
-            // Pass the data packet to the corresponding parsing function and return the result
-            return messageFunc.Invoke(dataPacket);
-        }
-        else // Message without data packet
-        {
-            // Lookup the message ID in the msgIdToFunc dictionary
-            var (messageFunc, expectedLength) = msgIdToFunc[msgId];
-            
-            // Check 'header' total length matches the expected number of bytes for this function (always 6 bytes for header-only messages)
-            if (header.Length != expectedLength)
-            {
-                throw new ArgumentException($"{MethodBase.GetCurrentMethod()?.Name} encountered an unexpected input array length ({header.Length} bytes) which does not match the expected length ({expectedLength} bytes).");
-            }
-            
-            // Pass the data packet to the corresponding parsing function and return the result
-            return messageFunc.Invoke(header);
-        }
-    }
-    
-    private dynamic MOD_GET_CHANENABLESTATE(byte[] inputData)
+    public dynamic MOD_GET_CHANENABLESTATE(byte[] inputData)
     {
         // Extract parameters from the message header
         byte chanIdent = inputData[2];
@@ -152,7 +134,7 @@ public class MessageUnpacker
     // HW_RESPONSE is also listed as a REQ, not a GET?
     // Similar issues for HW_RICHRESPONSE
     
-    private dynamic HW_GET_INFO(byte[] inputData)
+    public dynamic HW_GET_INFO(byte[] inputData)
     {
         // Extract parameters and package into list
         int serialNumber = BitConverter.ToInt32(inputData, 6);
@@ -167,7 +149,7 @@ public class MessageUnpacker
         return (serialNumber, modelNumber, type, firmwareVersion, hardwareVersion, modState, numberOfChannels);
     }
     
-    private dynamic HUB_GET_BAYUSED(byte[] inputData)
+    public dynamic HUB_GET_BAYUSED(byte[] inputData)
     {
         // Extract parameters and package into list
         sbyte bayIdent = (sbyte)inputData[2];
@@ -178,7 +160,7 @@ public class MessageUnpacker
         return bayIdent;
     }
     
-    private dynamic MOT_GET_POSCOUNTER(byte[] inputData)
+    public dynamic MOT_GET_POSCOUNTER(byte[] inputData)
     {
         // Extract parameters and package into list
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -188,7 +170,7 @@ public class MessageUnpacker
         return (chanIdent, position);
     }
     
-    private dynamic MOT_GET_ENCCOUNTER(byte[] inputData)
+    public dynamic MOT_GET_ENCCOUNTER(byte[] inputData)
     {
         // Extract parameters and package into list
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -198,7 +180,7 @@ public class MessageUnpacker
         return (chanIdent, encoderCount);
     }
     
-    private dynamic MOT_GET_VELPARAMS(byte[] inputData)
+    public dynamic MOT_GET_VELPARAMS(byte[] inputData)
     {
         // Extract parameters and package into list
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -210,7 +192,7 @@ public class MessageUnpacker
         return (chanIdent, minVelocity, acceleration, maxVelocity);
     }
 
-    private dynamic MOT_GET_JOGPARAMS(byte[] inputData)
+    public dynamic MOT_GET_JOGPARAMS(byte[] inputData)
     {
         // Extract parameters from the data packet
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -236,7 +218,7 @@ public class MessageUnpacker
         return (chanIdent, jogMode, jogStepSize, jogMinVelocity, jogAcceleration, jogMaxVelocity, stopMode);
     }
 
-    private dynamic MOT_GET_GENMOVEPARAMS(byte[] inputData)
+    public dynamic MOT_GET_GENMOVEPARAMS(byte[] inputData)
     {
         // Extract parameters
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -246,7 +228,7 @@ public class MessageUnpacker
         return (chanIdent, backlashDistance);
     }
 
-    private dynamic MOT_GET_MOVERELPARAMS(byte[] inputData)
+    public dynamic MOT_GET_MOVERELPARAMS(byte[] inputData)
     {
         // Extract parameters
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -256,7 +238,7 @@ public class MessageUnpacker
         return (chanIdent, relativeDistance);
     }
     
-    private dynamic MOT_GET_MOVEABSPARAMS(byte[] inputData)
+    public dynamic MOT_GET_MOVEABSPARAMS(byte[] inputData)
     {
         // Extract parameters and package into list
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -266,7 +248,7 @@ public class MessageUnpacker
         return (chanIdent, absolutePosition);
     }
 
-    private dynamic MOT_GET_HOMEPARAMS(byte[] inputData)
+    public dynamic MOT_GET_HOMEPARAMS(byte[] inputData)
     {
         // Extract parameters from the data packet
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -290,7 +272,7 @@ public class MessageUnpacker
         return (chanIdent, homingDirection, limitSwitch, homeVelocity, offsetDistance);
     }
     
-    private dynamic MOT_GET_LIMSWITCHPARAMS(byte[] inputData)
+    public dynamic MOT_GET_LIMSWITCHPARAMS(byte[] inputData)
     {
         // Extract parameters from the data packet
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -317,7 +299,7 @@ public class MessageUnpacker
             ccwSoftLimit, softLimitMode, isRotationStage);
     }
     
-    private dynamic MOT_MOVE_HOMED(byte[] inputData)
+    public dynamic MOT_MOVE_HOMED(byte[] inputData)
     {
         // Extract parameters and package into named tuple
         byte chanIdent = inputData[2];
@@ -330,7 +312,7 @@ public class MessageUnpacker
     // Why does MOT_MOVE_COMPLETED not follow the same header structure as ALL the other messages which are followed by a data packet?!
     // This means I can't reliably use bytes 2 & 3 to indicate data packet length.
     // In 'MOT_GET_USTATUSUPDATE' velocity and motor current are described as 'words' (unsigned 16-bit integer) but the example has signs
-    private dynamic MOT_MOVE_COMPLETED(byte[] inputData)
+    public dynamic MOT_MOVE_COMPLETED(byte[] inputData)
     {
         bool moveCompleted = true;
         
@@ -341,7 +323,7 @@ public class MessageUnpacker
         return (moveCompleted, statusBools);
     }
     
-    private dynamic MOT_MOVE_STOPPED(byte[] inputData)
+    public dynamic MOT_MOVE_STOPPED(byte[] inputData)
     {
         bool stopCompleted = true;
         
@@ -352,7 +334,7 @@ public class MessageUnpacker
         return (stopCompleted, statusBools);
     }
     
-    private dynamic MOT_GET_DCPIDPARAMS(byte[] inputData)
+    public dynamic MOT_GET_DCPIDPARAMS(byte[] inputData)
     {
         // Extract parameters from the data packet
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -373,7 +355,7 @@ public class MessageUnpacker
             applyIntegralLimit, integralLimit);
     }
 
-    private dynamic MOT_GET_AVMODES(byte[] inputData)
+    public dynamic MOT_GET_AVMODES(byte[] inputData)
     {
         // Extract parameters from the data packet
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -388,7 +370,7 @@ public class MessageUnpacker
         return (chanIdent, LEDMODE_IDENT, LEDMODE_LIMITSWITCH, LEDMODE_MOVING);
     }
 
-    private dynamic MOT_GET_POTPARAMS(byte[] inputData)
+    public dynamic MOT_GET_POTPARAMS(byte[] inputData)
     {
         // Extract parameters from the data packet
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -405,7 +387,7 @@ public class MessageUnpacker
         return (chanIdent, zeroWnd, vel1, wnd1, vel2, wnd2, vel3, wnd3, vel4);
     }
 
-    private dynamic MOT_GET_BUTTONPARAMS(byte[] inputData)
+    public dynamic MOT_GET_BUTTONPARAMS(byte[] inputData)
     {
         // Extract parameters from the data packet
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -425,7 +407,7 @@ public class MessageUnpacker
         return (chanIdent, mode, position1, position2, timeOut1, timeOut2);
     }
     
-    private dynamic MOT_GET_USTATUSUPDATE(byte[] inputData)
+    public dynamic MOT_GET_USTATUSUPDATE(byte[] inputData)
     {
         // Extract parameters from the data packet
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -441,7 +423,7 @@ public class MessageUnpacker
         return (chanIdent, position, velocity, motorCurrent, statusBools);
     }
     
-    private dynamic MOT_GET_STATUSBITS(byte[] inputData)
+    public dynamic MOT_GET_STATUSBITS(byte[] inputData)
     {
         // Extract parameters from the data packet
         short chanIdent = BitConverter.ToInt16(inputData, 0);
@@ -454,8 +436,10 @@ public class MessageUnpacker
         return (chanIdent, statusBools);
     }
     
-    private dynamic StatusBitsToBools(int statusBits)
+    public dynamic StatusBitsToBools(int statusBits)
     {
+        // TODO Throw an error & send 'StopAll' command if status bits indicate motor issue (eg. over-current)
+        
         bool P_MOT_SB_CWHARDLIMIT = (statusBits & 0x00000001) != 0;
         bool P_MOT_SB_CCWHARDLIMIT = (statusBits & 0x00000002) != 0;
         bool P_MOT_SB_CWSOFTLIMIT = (statusBits & 0x00000004) != 0;

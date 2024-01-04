@@ -1,15 +1,8 @@
-﻿namespace Functions;
+﻿namespace Outgoing;
 
-public abstract class Functions
+public abstract class MessageBuilder
 {
-    public static void Main(string[] args)
-    {
-    }
-    
-    // The client program is required to set up the necessary FTDI chip serial port settings 
-    // used to communicate to the Thorlabs controller embedded system (Protocol Issue 37, page 31)
-    
-    private static byte[] Pack(int msgid, int dest, int source, int param1 = 0, int param2 = 0, byte[]? dataPacket = null)
+    public static byte[] Pack(int msgid, int dest, int source, int param1 = 0, int param2 = 0, byte[]? dataPacket = null)
     {
         if (dataPacket != null)
         {
@@ -234,15 +227,13 @@ public abstract class Functions
         }
     }
     
-    public byte[] MOT_MOVE_ABSOLUTE(int dest, int source, int chanIdent, int? absolutePosition = null)
+    public static byte[] MOT_MOVE_ABSOLUTE(int dest, int source, int chanIdent, int? absolutePosition = null)
     {
         if (absolutePosition.HasValue)
         {
             var data = new List<byte>();
             data.AddRange(BitConverter.GetBytes((ushort)chanIdent));
-            data.AddRange(
-                BitConverter.GetBytes(absolutePosition
-                    .Value)); // If we used 'relativeDistance' directly, even though it's known to not be null at this position in the code, it would still be treated as a nullable int, which is not the desired type for the BitConverter.GetBytes method call.
+            data.AddRange(BitConverter.GetBytes(absolutePosition.Value)); // If we used 'relativeDistance' directly, even though it's known to not be null at this position in the code, it would still be treated as a nullable int, which is not the desired type for the BitConverter.GetBytes method call.
             return Pack(0x0453, dest, source, dataPacket: data.ToArray());
         }
         else
